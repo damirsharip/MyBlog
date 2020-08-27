@@ -3,16 +3,19 @@ var express = require("express"),
 	mongoose = require("mongoose"),
 	methodOverride = require("method-override"),
 	moment = require('moment'),
+	passport = require("passport"),
+	LocalStrategy = require("passport-local"),
 	Comment = require("./models/comment"),
 	Blog = require("./models/blog"),
 	expressSanitizer = require("express-sanitizer"),
+	User = require("./models/user"),
 	app = express(),
 	seedDB = require("./seeds")
 
 var dateTime = moment().format('YYYY-MM-DD');
 var dateTime2 = moment().subtract(10, 'days').calendar()
 
-seedDB();
+
 // APP CONFIG
 mongoose.connect('mongodb://localhost:27017/blogv1', { useNewUrlParser: true, useUnifiedTopology: true}); 
 app.set("view engine", "ejs")
@@ -20,14 +23,23 @@ app.use(bodyParser.urlencoded({extended: true}))
 app.use(expressSanitizer())
 app.use(express.static("public"))
 app.use(methodOverride("_method"))
+seedDB(); 
 
+app.use(require("express-session")({
+	secret: "once again dog in the world",
+    resave: false,
+    saveUninitialized: false
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
-// Blog.create({
-// 	title: "dameke emoe",
-// 	author: "dursta",
-// 	image: "jok image",
-// 	body: "zaparser;syn"
-// })
+app.use(function(req, res, next){
+	res.locals.currentUser = req.user;
+	next();
+});
 
 // RESTful routes 
 app.get("/", function(req, res){
@@ -119,7 +131,7 @@ app.delete("/blogs/:id", function(req, res){
 // COMMENTS ROUTES
 //================
 
-app.get("/blogs/:id/comments/new", function(req, res){
+app.get("/blogs/:id/comments/new",isLoggedIn, function(req, res){
 	Blog.findById(req.params.id, function(err, blog){
 		if (err){
 			console.log(err)
@@ -130,7 +142,7 @@ app.get("/blogs/:id/comments/new", function(req, res){
 })
 
 
-app.post("/blogs/:id/comments", function(req, res){
+app.post("/blogs/:id/comments",isLoggedIn, function(req, res){
    //lookup campground using ID
    Blog.findById(req.params.id, function(err, campground){
        if(err){
@@ -152,6 +164,54 @@ app.post("/blogs/:id/comments", function(req, res){
    //connect new comment to campground
    //redirect campground show page
 });
+
+//=============
+//Auth route
+//=============
+
+	// shou register
+app.get("/register", function(req, res){
+	res.render("register")
+})
+//handling user to sign handling
+app.post("/register", function(req, res){
+	var newUser = new User({username: req.body.username});
+	User.register(newUser, req.body.password, function(err, user){
+		if(err){
+			console.log(err);
+			return res.render("register")
+		}
+		passport.authenticate("local")(req, res, function(){
+			res.redirect("/blogs")
+		})
+	})
+})
+// // LOGIN ROUTES
+// // render login form
+app.get("/login", function(req, res){
+	res.render("login")
+})
+// // LOGIN LOGIC
+// // middleware
+app.post("/login", passport.authenticate("local", 
+	{
+		succesRedirect: "/blogs",
+		failureRedirect: "/login"
+	}), function(req, res){
+	res.redirect("/blogs")
+})
+
+app.get("/logout", function(req, res){
+	req.logout();
+	res.redirect("/blogs")
+})
+
+function isLoggedIn(req, res, next){
+	if(req.isAuthenticated()){
+		return next();
+	}
+	res.redirect("/login")
+}
 
 
 

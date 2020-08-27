@@ -12,4 +12,12 @@
 			<a href="/blogs" class="item">Home</a>
 			<a href="/blogs/new" class="item">New Post</a>
 		</div>
+		<% if(!currentUser){ %>
+			<li><a href="/register" class="item right floated">Sign Up</a></li>
+			<li><a href="/login" class="item right floated">Log in</a></li>
+		<% } else { %>
+			<li><a href="#" class="item right floated"><%= currentUser.username %></a></li>
+			<li><a href="/logout" class="item right floated">Log out</a></li>
+		<% } %>
+
 	</div>
